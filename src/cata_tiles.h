@@ -97,6 +97,31 @@ class texture
         }
 };
 
+/// A bridge between the old rendering code and the new shader-based code.
+/// @todo add shaders
+class render_cache {
+    private:
+        SDL_Texture_Ptr cache_ptr;
+		SDL_Texture* old_target;
+		int width, height;
+
+    public:
+        render_cache( const SDL_Renderer_Ptr &renderer, int width, int height );
+		render_cache() = delete;
+
+		/// Redirect all Render's rendering to this cache
+		int begin( const SDL_Renderer_Ptr &renderer, bool clear = true );
+
+		/// Return rendering to normal state
+		int end( const SDL_Renderer_Ptr &renderer ) const;
+
+		/// Render cache content to the current render target
+        int render_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect *const dstrect ) const;
+
+		/// Conjunction of @ref end and @ref render_copy
+		int end_and_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect *const dstrect ) const;
+};
+
 class tileset
 {
     private:
@@ -287,6 +312,7 @@ class cata_tiles
         /** How many rows and columns of tiles fit into given dimensions **/
         void get_window_tile_counts( int width, int height, int &columns, int &rows ) const;
 
+		render_cache& get_or_create_render_cache( const SDL_Renderer_Ptr &renderer, int width, int height );
         const tile_type *find_tile_with_season( std::string &id );
         const tile_type *find_tile_looks_like( std::string &id, TILE_CATEGORY category );
         bool find_overlay_looks_like( bool male, const std::string &overlay, std::string &draw_id );
@@ -497,6 +523,7 @@ class cata_tiles
         /** Variables */
         const SDL_Renderer_Ptr &renderer;
         std::unique_ptr<tileset> tileset_ptr;
+		std::unordered_map<int, std::unordered_map<int, render_cache>> render_caches;
 
         int tile_height = 0;
         int tile_width = 0;

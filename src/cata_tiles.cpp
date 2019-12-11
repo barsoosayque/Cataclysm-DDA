@@ -1968,10 +1968,13 @@ bool cata_tiles::draw_sprite_at(
     std::tie( width, height ) = sprite_tex->dimension();
 
     SDL_Rect destination;
-    destination.x = p.x + tile.offset.x * tile_width / tileset_ptr->get_tile_width();
-    destination.y = p.y + ( tile.offset.y - height_3d ) * tile_width / tileset_ptr->get_tile_width();
-    destination.w = width * tile_width / tileset_ptr->get_tile_width();
-    destination.h = height * tile_height / tileset_ptr->get_tile_height();
+    destination.w = width;
+    destination.h = height;
+    destination.x = 0;
+    destination.y = 0;
+
+	render_cache& cache = get_or_create_render_cache( renderer, width, height );
+	printErrorIf( cache.begin( renderer ) != 0, "cache begin error" );
 
     if( rotate_sprite ) {
         switch( rota ) {
@@ -2025,11 +2028,73 @@ bool cata_tiles::draw_sprite_at(
     }
 
     printErrorIf( ret != 0, "SDL_RenderCopyEx() failed" );
+
+	printErrorIf( cache.end( renderer ) != 0, "cache end error" );
+
+    destination.w = width * tile_width / tileset_ptr->get_tile_width();
+    destination.h = height * tile_height / tileset_ptr->get_tile_height();
+    destination.x = p.x + tile.offset.x * tile_width / tileset_ptr->get_tile_width();
+    destination.y = p.y + ( tile.offset.y - height_3d ) * tile_width / tileset_ptr->get_tile_width();
+	printErrorIf( cache.render_copy( renderer, &destination ) != 0, "cache render error" );
+
     // this reference passes all the way back up the call chain back to
     // cata_tiles::draw() std::vector<tile_render_info> draw_points[].height_3d
     // where we are accumulating the height of every sprite stacked up in a tile
     height_3d += tile.height_3d;
     return true;
+}
+
+render_cache& cata_tiles::get_or_create_render_cache( const SDL_Renderer_Ptr &renderer, int width, int height ) {
+	if( render_caches[width].count(height) == 0 ) {
+        DebugLog( D_INFO, DC_ALL ) << "Create new render cache of size "
+								   << width << "x" << height;
+		render_caches[width].emplace(std::piecewise_construct,
+								     std::forward_as_tuple(height),
+								     std::forward_as_tuple(renderer, width, height));
+	}
+	return render_caches.at(width).at(height);
+}
+
+render_cache::render_cache( const SDL_Renderer_Ptr &renderer, int width, int height ) {
+	cache_ptr.reset(SDL_CreateTexture( renderer.get(), SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_TARGET, width, height ));
+	if( cache_ptr == NULL ) {
+        DebugLog( D_INFO, DC_ALL ) << "Cannot create target texture for render_cache";
+	} else {
+		SDL_SetTextureBlendMode(cache_ptr.get(), SDL_BLENDMODE_BLEND);
+		this->width = width;
+		this->height = height;
+	}
+}
+
+int render_cache::begin( const SDL_Renderer_Ptr &renderer, bool clear ) {
+	old_target = SDL_GetRenderTarget( renderer.get() );
+	if ( int ret = SDL_SetRenderTarget( renderer.get(), cache_ptr.get() ) ) {
+		return ret;	
+	}
+	if(clear) {
+		SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_NONE);
+		SDL_SetRenderDrawColor(renderer.get(), 0, 255, 0, 255);
+		SDL_RenderFillRect(renderer.get(), NULL);
+		SDL_SetRenderDrawBlendMode(renderer.get(), SDL_BLENDMODE_BLEND);
+		SDL_SetRenderDrawColor(renderer.get(), 255, 255, 255, 255);
+	}
+	return 0;
+}
+
+int render_cache::end( const SDL_Renderer_Ptr &renderer ) const {
+	return SDL_SetRenderTarget( renderer.get(), old_target );
+}
+
+int render_cache::render_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect *const dstrect ) const {
+	return SDL_RenderCopy( renderer.get(), cache_ptr.get(), NULL, dstrect );
+}
+
+int render_cache::end_and_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect *const dstrect ) const {
+	if(int ret = end( renderer )) {
+		return ret;	
+	} else {
+		return render_copy( renderer, dstrect );
+	}
 }
 
 bool cata_tiles::draw_tile_at(
