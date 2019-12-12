@@ -21,6 +21,7 @@
 #include "enums.h"
 #include "weighted_list.h"
 #include "point.h"
+#include "shader.h"
 
 class Creature;
 class player;
@@ -97,8 +98,7 @@ class texture
         }
 };
 
-/// A bridge between the old rendering code and the new shader-based code.
-/// @todo add shaders
+/// A wrapper for a @ref SDL_Texture with a target access
 class render_cache {
     private:
         SDL_Texture_Ptr cache_ptr;
@@ -120,6 +120,9 @@ class render_cache {
 
 		/// Conjunction of @ref end and @ref render_copy
 		int end_and_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect *const dstrect ) const;
+		
+		/// Returns underlying @ref SDL_Texture.
+		SDL_Texture* get() const;
 };
 
 class tileset
@@ -524,6 +527,8 @@ class cata_tiles
         const SDL_Renderer_Ptr &renderer;
         std::unique_ptr<tileset> tileset_ptr;
 		std::unordered_map<int, std::unordered_map<int, render_cache>> render_caches;
+		std::unique_ptr<shader_context> shader_context_ptr;
+		std::shared_ptr<shader> tmp_shader;
 
         int tile_height = 0;
         int tile_width = 0;

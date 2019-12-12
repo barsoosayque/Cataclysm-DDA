@@ -216,6 +216,18 @@ void cata_tiles::on_options_changed()
     settings.square_pixels = get_option<bool>( "PIXEL_MINIMAP_RATIO" );
     settings.scale_to_fit = get_option<bool>( "PIXEL_MINIMAP_SCALE_TO_FIT" );
 
+
+#if !defined(__ANDROID__)
+    if ( get_option<std::string>( "RENDERER" ) != "software" ) {
+#else
+    if (!get_option<bool>( "SOFTWARE_RENDERING" )) {
+#endif
+		shader_context_ptr = std::make_unique<shader_context>();
+        printErrorIf( !shader_context_ptr->init(), "Shader context failed to init" );
+		tmp_shader = shader_context_ptr->compile_from_file("data/shaders/example.vert",
+                                                           "data/shaders/example.frag");
+	}
+
     minimap->set_settings( settings );
 }
 
@@ -2035,7 +2047,11 @@ bool cata_tiles::draw_sprite_at(
     destination.h = height * tile_height / tileset_ptr->get_tile_height();
     destination.x = p.x + tile.offset.x * tile_width / tileset_ptr->get_tile_width();
     destination.y = p.y + ( tile.offset.y - height_3d ) * tile_width / tileset_ptr->get_tile_width();
-	printErrorIf( cache.render_copy( renderer, &destination ) != 0, "cache render error" );
+
+	shader_context_ptr->copy_with_shader( cache.get(), *tmp_shader.get(),
+					      				  NULL, &destination );
+									 
+	// printErrorIf( cache.render_copy( renderer, &destination ) != 0, "cache render error" );
 
     // this reference passes all the way back up the call chain back to
     // cata_tiles::draw() std::vector<tile_render_info> draw_points[].height_3d
@@ -2095,6 +2111,10 @@ int render_cache::end_and_copy( const SDL_Renderer_Ptr &renderer, const SDL_Rect
 	} else {
 		return render_copy( renderer, dstrect );
 	}
+}
+
+SDL_Texture* render_cache::get() const {
+	return cache_ptr.get();
 }
 
 bool cata_tiles::draw_tile_at(

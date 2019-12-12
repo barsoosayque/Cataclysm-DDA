@@ -547,7 +547,7 @@ ifdef TILES
       LDFLAGS += $(shell $(SDL2_CONFIG) --libs)
     endif
 
-    LDFLAGS += -lSDL2_ttf -lSDL2_image
+    LDFLAGS += -lSDL2_ttf -lSDL2_image -lGL
 
     # We don't use SDL_main -- we have proper main()/WinMain()
     CXXFLAGS := $(filter-out -Dmain=SDL_main,$(CXXFLAGS))
