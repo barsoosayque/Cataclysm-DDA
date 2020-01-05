@@ -4,7 +4,6 @@
 #include <cmath>
 #include <cstddef>
 #include <algorithm>
-#include <sstream>
 #include <string>
 #include <vector>
 #include <array>
@@ -24,6 +23,7 @@
 #include "debug.h"
 #include "faction_camp.h"
 #include "game.h"
+#include "game_inventory.h"
 #include "help.h"
 #include "input.h"
 #include "item.h"
@@ -243,27 +243,27 @@ static void npc_temp_orders_menu( const std::vector<npc *> &npc_list )
 
     while( !done ) {
         int override_count = 0;
-        std::ostringstream override_string;
-        override_string << string_format( _( "%s currently has these temporary orders:" ), guy->name );
+        std::string output_string = string_format( _( "%s currently has these temporary orders:" ),
+                                    guy->name );
         for( const auto &rule : ally_rule_strs ) {
             if( guy->rules.has_override_enable( rule.second.rule ) ) {
                 override_count++;
-                override_string << "\n  ";
-                override_string << ( guy->rules.has_override( rule.second.rule ) ?
-                                     rule.second.rule_true_text : rule.second.rule_false_text );
+                output_string += "\n  ";
+                output_string += ( guy->rules.has_override( rule.second.rule ) ? rule.second.rule_true_text :
+                                   rule.second.rule_false_text );
             }
         }
         if( override_count == 0 ) {
-            override_string << "\n  " << _( "None." ) << "\n";
+            output_string += std::string( "\n  " ) + _( "None." ) + "\n";
         }
         if( npc_list.size() > 1 ) {
-            override_string << "\n" << _( "Other followers might have different temporary orders." );
+            output_string += std::string( "\n" ) +
+                             _( "Other followers might have different temporary orders." );
         }
         g->refresh_all();
         nmenu.reset();
         nmenu.text = _( "Issue what temporary order?" );
         nmenu.desc_enabled = true;
-        std::string output_string = override_string.str();
         parse_tags( output_string, g->u, *guy );
         nmenu.footer_text = output_string;
         nmenu.addentry( NPC_CHAT_DONE, true, 'd', _( "Done issuing orders" ) );
@@ -546,17 +546,16 @@ void game::chat()
     refresh_all();
 }
 
-void npc::handle_sound( int priority, const std::string &description, int heard_volume,
-                        const tripoint &spos )
+void npc::handle_sound( const sounds::sound_t spriority, const std::string &description,
+                        int heard_volume, const tripoint &spos )
 {
     const tripoint s_abs_pos = g->m.getabs( spos );
     const tripoint my_abs_pos = g->m.getabs( pos() );
 
     add_msg( m_debug, "%s heard '%s', priority %d at volume %d from %d:%d, my pos %d:%d",
-             disp_name(), description, priority, heard_volume, s_abs_pos.x, s_abs_pos.y,
-             my_abs_pos.x, my_abs_pos.y );
+             disp_name(), description, static_cast<int>( spriority ), heard_volume,
+             s_abs_pos.x, s_abs_pos.y, my_abs_pos.x, my_abs_pos.y );
 
-    const sounds::sound_t spriority = static_cast<sounds::sound_t>( priority );
     bool player_ally = g->u.pos() == spos && is_player_ally();
     player *const sound_source = g->critter_at<player>( spos );
     bool npc_ally = sound_source && sound_source->is_npc() && is_ally( *sound_source );
@@ -628,7 +627,7 @@ void npc::handle_sound( int priority, const std::string &description, int heard_
                 dangerous_sound temp_sound;
                 temp_sound.abs_pos = s_abs_pos;
                 temp_sound.volume = heard_volume;
-                temp_sound.type = priority;
+                temp_sound.type = spriority;
                 if( !ai_cache.sound_alerts.empty() ) {
                     if( ai_cache.sound_alerts.back().abs_pos != s_abs_pos ) {
                         ai_cache.sound_alerts.push_back( temp_sound );
@@ -1192,8 +1191,6 @@ void dialogue::gen_responses( const talk_topic &the_topic )
         if( !g->u.backlog.empty() && g->u.backlog.front().id() == activity_id( "ACT_TRAIN" ) &&
             g->u.backlog.front().index == p->getID().get_value() ) {
             player_activity &backlog = g->u.backlog.front();
-            std::stringstream resume;
-            resume << _( "Yes, let's resume training " );
             const skill_id skillt( backlog.name );
             // TODO: This is potentially dangerous. A skill and a martial art
             // could have the same ident!
@@ -1202,17 +1199,17 @@ void dialogue::gen_responses( const talk_topic &the_topic )
                 if( !styleid.is_valid() ) {
                     const spell_id &sp_id = spell_id( backlog.name );
                     if( p->magic.knows_spell( sp_id ) ) {
-                        resume << sp_id->name.translated();
-                        add_response( resume.str(), "TALK_TRAIN_START", sp_id );
+                        add_response( string_format( _( "Yes, let's resume training %s" ), sp_id->name ),
+                                      "TALK_TRAIN_START", sp_id );
                     }
                 } else {
-                    martialart style = styleid.obj();
-                    resume << style.name;
-                    add_response( resume.str(), "TALK_TRAIN_START", style );
+                    const martialart &style = styleid.obj();
+                    add_response( string_format( _( "Yes, let's resume training %s" ), style.name ), "TALK_TRAIN_START",
+                                  style );
                 }
             } else {
-                resume << skillt.obj().name();
-                add_response( resume.str(), "TALK_TRAIN_START", skillt );
+                add_response( string_format( _( "Yes, let's resume training %s" ), skillt->name() ),
+                              "TALK_TRAIN_START", skillt );
             }
         }
         std::vector<matype_id> styles = p->styles_offered_to( g->u );
@@ -1663,8 +1660,7 @@ talk_topic dialogue::opt( dialogue_window &d_win, const talk_topic &topic )
     gen_responses( topic );
     // Put quotes around challenge (unless it's an action)
     if( challenge[0] != '*' && challenge[0] != '&' ) {
-        std::stringstream tmp;
-        tmp << "\"" << challenge << "\"";
+        challenge = "\"" + challenge + "\"";
     }
 
     // Parse any tags in challenge
@@ -1782,7 +1778,7 @@ talk_trial::talk_trial( const JsonObject &jo )
 
     read_condition<dialogue>( jo, "condition", condition, false );
 
-    if( jo.has_array( "mod" ) ) {
+    if( jo.has_member( "mod" ) ) {
         for( JsonArray jmod : jo.get_array( "mod" ) ) {
             trial_mod this_modifier;
             this_modifier.first = jmod.next_string();
@@ -2680,13 +2676,12 @@ void talk_effect_t::load_effect( const JsonObject &jo )
         JsonObject sub_effect = jo.get_object( member_name );
         parse_sub_effect( sub_effect );
     } else if( jo.has_array( member_name ) ) {
-        JsonArray ja = jo.get_array( member_name );
-        while( ja.has_more() ) {
-            if( ja.test_string() ) {
-                const std::string type = ja.next_string();
+        for( const JsonValue &entry : jo.get_array( member_name ) ) {
+            if( entry.test_string() ) {
+                const std::string type = entry.get_string();
                 parse_string_effect( type, jo );
-            } else if( ja.test_object() ) {
-                JsonObject sub_effect = ja.next_object();
+            } else if( entry.test_object() ) {
+                JsonObject sub_effect = entry.get_object();
                 parse_sub_effect( sub_effect );
             } else {
                 jo.throw_error( "invalid effect array syntax", member_name );
@@ -2873,16 +2868,15 @@ dynamic_line_t::dynamic_line_t( const JsonObject &jo )
 {
     if( jo.has_member( "and" ) ) {
         std::vector<dynamic_line_t> lines;
-        JsonArray ja = jo.get_array( "and" );
-        while( ja.has_more() ) {
-            if( ja.test_string() ) {
-                lines.emplace_back( ja.next_string() );
-            } else if( ja.test_array() ) {
-                lines.emplace_back( ja.next_array() );
-            } else if( ja.test_object() ) {
-                lines.emplace_back( ja.next_object() );
+        for( const JsonValue &entry : jo.get_array( "and" ) ) {
+            if( entry.test_string() ) {
+                lines.emplace_back( entry.get_string() );
+            } else if( entry.test_array() ) {
+                lines.emplace_back( entry.get_array() );
+            } else if( entry.test_object() ) {
+                lines.emplace_back( entry.get_object() );
             } else {
-                ja.throw_error( "invalid format: must be string, array or object" );
+                entry.throw_error( "invalid format: must be string, array or object" );
             }
         }
         function = [lines]( const dialogue & d ) {
@@ -2892,11 +2886,11 @@ dynamic_line_t::dynamic_line_t( const JsonObject &jo )
             }
             return all_lines;
         };
-    } else if( jo.has_member( "give_hint" ) ) {
+    } else if( jo.get_bool( "give_hint", false ) ) {
         function = [&]( const dialogue & ) {
             return get_hint();
         };
-    } else if( jo.has_member( "use_reason" ) ) {
+    } else if( jo.get_bool( "use_reason", false ) ) {
         function = [&]( const dialogue & d ) {
             std::string tmp = d.reason;
             d.reason.clear();
@@ -2924,6 +2918,10 @@ dynamic_line_t::dynamic_line_t( const JsonObject &jo )
         const dynamic_line_t no = from_member( jo, "no" );
         for( const std::string &sub_member : dialogue_data::simple_string_conds ) {
             if( jo.has_bool( sub_member ) ) {
+                // This also marks the member as visited.
+                if( !jo.get_bool( sub_member ) ) {
+                    jo.throw_error( "value must be true", sub_member );
+                }
                 dcondition = conditional_t<dialogue>( sub_member );
                 function = [dcondition, yes, no]( const dialogue & d ) {
                     return ( dcondition( d ) ? yes : no )( d );
@@ -2954,15 +2952,15 @@ dynamic_line_t::dynamic_line_t( const JsonObject &jo )
 dynamic_line_t::dynamic_line_t( JsonArray ja )
 {
     std::vector<dynamic_line_t> lines;
-    while( ja.has_more() ) {
-        if( ja.test_string() ) {
-            lines.emplace_back( ja.next_string() );
-        } else if( ja.test_array() ) {
-            lines.emplace_back( ja.next_array() );
-        } else if( ja.test_object() ) {
-            lines.emplace_back( ja.next_object() );
+    for( const JsonValue &entry : ja ) {
+        if( entry.test_string() ) {
+            lines.emplace_back( entry.get_string() );
+        } else if( entry.test_array() ) {
+            lines.emplace_back( entry.get_array() );
+        } else if( entry.test_object() ) {
+            lines.emplace_back( entry.get_object() );
         } else {
-            ja.throw_error( "invalid format: must be string, array or object" );
+            entry.throw_error( "invalid format: must be string, array or object" );
         }
     }
     function = [lines]( const dialogue & d ) {
@@ -3220,11 +3218,12 @@ std::string give_item_to( npc &p, bool allow_use, bool allow_carry )
     if( p.is_hallucination() ) {
         return _( "No thanks, I'm good." );
     }
-    const int inv_pos = g->inv_for_all( _( "Offer what?" ), _( "You have no items to offer." ) );
-    item &given = g->u.i_at( inv_pos );
-    if( given.is_null() ) {
+    item_location loc = game_menus::inv::titled_menu( g->u, _( "Offer what?" ),
+                        _( "You have no items to offer." ) );
+    if( !loc ) {
         return _( "Changed your mind?" );
     }
+    item &given = *loc;
 
     if( ( &given == &g->u.weapon && given.has_flag( "NO_UNWIELD" ) ) || ( g->u.is_worn( given ) &&
             given.has_flag( "NO_TAKEOFF" ) ) ) {
@@ -3241,7 +3240,7 @@ std::string give_item_to( npc &p, bool allow_use, bool allow_carry )
         // Eating first, to avoid evaluating bread as a weapon
         const auto consume_res = try_consume( p, given, no_consume_reason );
         if( consume_res == CONSUMED_ALL ) {
-            g->u.i_rem( inv_pos );
+            g->u.i_rem( &given );
         }
         if( consume_res != REFUSED ) {
             g->u.moves -= 100;
@@ -3281,7 +3280,7 @@ std::string give_item_to( npc &p, bool allow_use, bool allow_carry )
     }
 
     if( taken ) {
-        g->u.i_rem( inv_pos );
+        g->u.i_rem( &given );
         g->u.moves -= 100;
         p.has_new_items = true;
         return _( "Thanks!" );

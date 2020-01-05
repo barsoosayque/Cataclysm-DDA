@@ -1,7 +1,7 @@
 #include "avatar.h"
 
-#include <limits.h>
-#include <stdlib.h>
+#include <climits>
+#include <cstdlib>
 #include <algorithm>
 #include <list>
 #include <map>
@@ -323,6 +323,8 @@ const player *avatar::get_book_reader( const item &book, std::vector<std::string
                    has_identified( book.typeId() ) ) {
             // Low morale still permits skimming
             reasons.push_back( string_format( _( "%s morale is too low!" ), elem->disp_name( true ) ) );
+        } else if( elem->is_blind() ) {
+            reasons.push_back( string_format( _( "% is blind." ), elem->disp_name( true ) ) );
         } else {
             int proj_time = time_to_read( book, *elem );
             if( proj_time < time_taken ) {
@@ -372,9 +374,8 @@ int avatar::time_to_read( const item &book, const player &reader, const player *
  * str_values: Parallel to values, these contain the learning penalties (as doubles in string form) as follows:
  *             Experience gained = Experience normally gained * penalty
  */
-bool avatar::read( int inventory_position, const bool continuous )
+bool avatar::read( item &it, const bool continuous )
 {
-    item &it = i_at( inventory_position );
     if( it.is_null() ) {
         add_msg( m_info, _( "Never mind." ) );
         return false;
@@ -896,7 +897,7 @@ void avatar::do_read( item &book )
 
     if( continuous ) {
         activity.set_to_null();
-        read( get_item_position( &book ), true );
+        read( book, true );
         if( activity ) {
             return;
         }
@@ -1165,7 +1166,7 @@ void avatar::reset_stats()
     }
 
     // Radiation
-    set_fake_effect_dur( effect_irradiated, 1_turns * radiation );
+    set_fake_effect_dur( effect_irradiated, 1_turns * get_rad() );
     // Morale
     const int morale = get_morale_level();
     set_fake_effect_dur( effect_happy, 1_turns * morale );

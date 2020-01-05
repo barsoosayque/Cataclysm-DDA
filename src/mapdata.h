@@ -371,6 +371,8 @@ struct furn_t : map_data_common_t {
 
     static size_t count();
 
+    bool is_movable() const;
+
     void load( const JsonObject &jo, const std::string &src ) override;
     void check() const override;
 };
@@ -548,8 +550,7 @@ extern furn_id f_null,
        f_brazier,
        f_firering,
        f_tourist_table,
-       f_camp_chair,
-       f_autodoc_couch;
+       f_camp_chair;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 //// These are on their way OUT and only used in certain switch statements until they are rewritten.
