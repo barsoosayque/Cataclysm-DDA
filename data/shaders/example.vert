@@ -1,9 +1,10 @@
-varying lowp vec4 v_color;
-varying lowp vec2 v_texCoord;
+uniform mat4 u_projection; 
+attribute vec2 a_texCoord; 
+attribute vec2 a_position; 
+varying vec2 v_texCoord; 
 
-void main()
-{
-    gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-    v_color = gl_Color;
-    v_texCoord = vec2(gl_MultiTexCoord0);
-}
+void main() { 
+    v_texCoord = a_texCoord; 
+    gl_Position = u_projection * vec4(a_position, 0.0, 1.0);
+    gl_PointSize = 1.0;
+} 
