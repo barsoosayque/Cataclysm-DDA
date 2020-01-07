@@ -1985,59 +1985,72 @@ bool cata_tiles::draw_sprite_at(
     destination.x = p.x + tile.offset.x * tile_width / tileset_ptr->get_tile_width();
     destination.y = p.y + ( tile.offset.y - height_3d ) * tile_width / tileset_ptr->get_tile_width();
 
-    /* if( rotate_sprite ) { */
-    /*     switch( rota ) { */
-    /*         default: */
-    /*         case 0: */
-    /*             // unrotated (and 180, with just two sprites) */
-    /*             ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
-    /*             break; */
-    /*         case 1: */
-    /*             // 90 degrees (and 270, with just two sprites) */
-/* #if defined(_WIN32) */
-    /*             destination.y -= 1; */
-/* #endif */
-    /*             if( !tile_iso ) { */
-    /*                 // never rotate isometric tiles */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, -90, nullptr, SDL_FLIP_NONE ); */
-    /*             } else { */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
-    /*             } */
-    /*             break; */
-    /*         case 2: */
-    /*             // 180 degrees, implemented with flips instead of rotation */
-    /*             if( !tile_iso ) { */
-    /*                 // never flip isometric tiles vertically */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, */
-    /*                                                   static_cast<SDL_RendererFlip>( SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL ) ); */
-    /*             } else { */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
-    /*             } */
-    /*             break; */
-    /*         case 3: */
-    /*             // 270 degrees */
-/* #if defined(_WIN32) */
-    /*             destination.x -= 1; */
-/* #endif */
-    /*             if( !tile_iso ) { */
-    /*                 // never rotate isometric tiles */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, 90, nullptr, SDL_FLIP_NONE ); */
-    /*             } else { */
-    /*                 ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
-    /*             } */
-    /*             break; */
-    /*         case 4: */
-    /*             // flip horizontally */
-    /*             ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, */
-    /*                                               static_cast<SDL_RendererFlip>( SDL_FLIP_HORIZONTAL ) ); */
-    /*     } */
-    /* } else { */
+    SDL_RenderFlush( renderer.get() );
+    if( rotate_sprite ) {
+        switch( rota ) {
+            default:
+            case 0:
+                // unrotated (and 180, with just two sprites)
+                /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
+                sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination );
+                break;
+            case 1:
+                // 90 degrees (and 270, with just two sprites)
+#if defined(_WIN32)
+                destination.y -= 1;
+#endif
+                if( !tile_iso ) {
+                    // never rotate isometric tiles
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, -90, nullptr, SDL_FLIP_NONE ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination,
+                                                  shader_context::rotation::minus90 );
+                } else {
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination );
+                }
+                break;
+            case 2:
+                // 180 degrees, implemented with flips instead of rotation
+                if( !tile_iso ) {
+                    // never flip isometric tiles vertically
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, */
+                    /*                                   static_cast<SDL_RendererFlip>( SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL ) ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination,
+                                                  shader_context::rotation::none,
+                                                  static_cast<SDL_RendererFlip>( SDL_FLIP_HORIZONTAL | SDL_FLIP_VERTICAL ) );
+                } else {
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination );
+                }
+                break;
+            case 3:
+                // 270 degrees
+#if defined(_WIN32)
+                destination.x -= 1;
+#endif
+                if( !tile_iso ) {
+                    // never rotate isometric tiles
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, 90, nullptr, SDL_FLIP_NONE ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination,
+                                                  shader_context::rotation::plus90 );
+                } else {
+                    /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
+                    sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination );
+                }
+                break;
+            case 4:
+                // flip horizontally
+                /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, */
+                /*                                   static_cast<SDL_RendererFlip>( SDL_FLIP_HORIZONTAL ) ); */
+                sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination,
+                                              shader_context::rotation::none,
+                                              static_cast<SDL_RendererFlip>(SDL_FLIP_HORIZONTAL ));
+        }
+    } else {
         // don't rotate, same as case 0 above
         /* ret = sprite_tex->render_copy_ex( renderer, &destination, 0, nullptr, SDL_FLIP_NONE ); */
-        if( rotate_sprite ) { }
-        SDL_RenderFlush( renderer.get() );
         sprite_tex->copy_with_shader( shader_context_ptr, tmp_shader, &destination );
-    /* } */
+    }
 
     printErrorIf( ret != 0, "SDL_RenderCopyEx() failed" );
 

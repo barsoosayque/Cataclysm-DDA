@@ -1,5 +1,6 @@
 #include <fstream>
 #include <iostream>
+#include <algorithm>
 #include "shader.h"
 #include "debug.h"
 
@@ -132,16 +133,7 @@ std::shared_ptr<shader> shader_context::compile_from_file(std::string vertex_pat
 bool shader_context::bind(const std::shared_ptr<shader> &program) {
 	if(program->id) {
 		glGetIntegerv(GL_CURRENT_PROGRAM, &old_shader_id);
-        glGetIntegerv(GL_VIEWPORT, tmp.data());
-        projection[0][0] = 2.0f / tmp[2];
-        // mul [1][1] and [3][1] by -1 to switch FBO/Screen modes
-        projection[1][1] = 2.0f / tmp[3];
-        projection[3][1] = -1.0f;
-
 		glUseProgram(program->id);
-        glUniform1i(program->u_texture, 0);
-        glUniformMatrix4fv(program->u_projection, 1, GL_FALSE, reinterpret_cast<GLfloat*>(projection.data()));
-
 		return true;
 	}
 	return false;
@@ -155,7 +147,8 @@ bool shader_context::unbind() {
 }
 
 bool shader_context::copy_with_shader(SDL_Texture *tex, const std::shared_ptr<shader> &program,
-					 				  const SDL_Rect* srcrect, const SDL_Rect* dstrect) {
+					 				  const SDL_Rect* srcrect, const SDL_Rect* dstrect,
+                                      shader_context::rotation rot, SDL_RendererFlip flip) {
 
 	if( SDL_GL_BindTexture(tex, NULL, NULL) ) {
         dbg( D_ERROR ) << "Texture binding failed: " << SDL_GetError();
@@ -165,6 +158,16 @@ bool shader_context::copy_with_shader(SDL_Texture *tex, const std::shared_ptr<sh
         dbg( D_ERROR ) << "Shader binding failed";
         return false;
 	}
+
+    // Prepare uniforms, textures
+    glGetIntegerv(GL_VIEWPORT, tmp.data());
+    projection[0][0] = 2.0f / tmp[2];
+    // mul [1][1] and [3][1] by -1 to switch FBO/Screen modes
+    projection[1][1] = 2.0f / tmp[3];
+    projection[3][1] = -1.0f;
+
+    glUniform1i(program->u_texture, 0);
+    glUniformMatrix4fv(program->u_projection, 1, GL_FALSE, reinterpret_cast<GLfloat*>(projection.data()));
 
 	// Create source rect in UV coords
 	GLfloat u1 = 0.0f, v1 = 0.0f, u2 = 1.0f, v2 = 1.0f;
@@ -186,10 +189,30 @@ bool shader_context::copy_with_shader(SDL_Texture *tex, const std::shared_ptr<sh
 		u2 = static_cast<float>(srcrect->x + srcrect->w) / tex_w;
 		v2 = static_cast<float>(srcrect->y + srcrect->h) / tex_h;
 	}
-    shader_data[8]  = u1; shader_data[9]  = v1;
-    shader_data[10] = u2; shader_data[11] = v1;
-    shader_data[12] = u1; shader_data[13] = v2;
-    shader_data[14] = u2; shader_data[15] = v2;
+
+    if(rot == rotation::none) {
+        if(flip & SDL_FLIP_HORIZONTAL) {
+            std::swap(u1, u2);
+        }
+        if(flip & SDL_FLIP_VERTICAL) {
+            std::swap(v1, v2);
+        }
+        shader_data[8]  = u1; shader_data[9]  = v1;
+        shader_data[10] = u2; shader_data[11] = v1;
+        shader_data[12] = u1; shader_data[13] = v2;
+        shader_data[14] = u2; shader_data[15] = v2;
+    } else {
+        if((rot == rotation::minus90) ^ ((flip & SDL_FLIP_VERTICAL) != 0)) {
+            std::swap(u1, u2);
+        }
+        if((rot == rotation::plus90) ^ ((flip & SDL_FLIP_HORIZONTAL) != 0)) {
+            std::swap(v1, v2);
+        }
+        shader_data[8]  = u1; shader_data[9]  = v1;
+        shader_data[10] = u1; shader_data[11] = v2;
+        shader_data[12] = u2; shader_data[13] = v1;
+        shader_data[14] = u2; shader_data[15] = v2;
+    }
     
 	// Render
     glEnable(GL_BLEND);

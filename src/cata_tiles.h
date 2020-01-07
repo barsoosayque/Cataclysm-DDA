@@ -101,8 +101,10 @@ class texture
         /// Interface to @ref shader_context::copy_with_shader, using this as 
         /// the texture, rendering current texture region to the destination.
 		bool copy_with_shader(std::unique_ptr<shader_context> &context, 
-                              const std::shared_ptr<shader> &program, const SDL_Rect* dstrect) const {
-            return context->copy_with_shader(sdl_texture_ptr.get(), program, &srcrect, dstrect); 
+                              const std::shared_ptr<shader> &program, const SDL_Rect* dstrect,
+                              shader_context::rotation rot = shader_context::rotation::none, 
+                              SDL_RendererFlip flip = SDL_FLIP_NONE) const {
+            return context->copy_with_shader(sdl_texture_ptr.get(), program, &srcrect, dstrect, rot, flip); 
         }
 };
 

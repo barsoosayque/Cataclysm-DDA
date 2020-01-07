@@ -68,6 +68,8 @@ class shader_context {
         std::array<int, 8> vbo_sizes;
 
 	public:
+        enum class rotation { none, plus90, minus90 };
+
         shader_context();
         ~shader_context();
 
@@ -92,7 +94,8 @@ class shader_context {
 		/// Utility method to mimic SDL renderer copy method but
 		/// perform the draw with a shader.
 		bool copy_with_shader(SDL_Texture *tex, const std::shared_ptr<shader> &program,
-                              const SDL_Rect* srcrect, const SDL_Rect* dstrect);
+                              const SDL_Rect* srcrect, const SDL_Rect* dstrect,
+                              rotation rot = rotation::none, SDL_RendererFlip flip = SDL_FLIP_NONE);
 };
 
 #endif
