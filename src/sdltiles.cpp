@@ -255,19 +255,7 @@ extern catacurses::window w_hit_animation; //this window overlays w_terrain whic
 //***********************************
 static void generate_alt_rect_texture()
 {
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    static const Uint32 rmask = 0xff000000;
-    static const Uint32 gmask = 0x00ff0000;
-    static const Uint32 bmask = 0x0000ff00;
-    static const Uint32 amask = 0x000000ff;
-#else
-    static const Uint32 rmask = 0x000000ff;
-    static const Uint32 gmask = 0x0000ff00;
-    static const Uint32 bmask = 0x00ff0000;
-    static const Uint32 amask = 0xff000000;
-#endif
-
-    SDL_Surface_Ptr alt_surf( SDL_CreateRGBSurface( 0, 1, 1, 32, rmask, gmask, bmask, amask ) );
+    SDL_Surface_Ptr alt_surf = CreateRGBSurface( 0, 1, 1, 32 );
     if( alt_surf ) {
         FillRect( alt_surf, nullptr, SDL_MapRGB( alt_surf->format, 255, 255, 255 ) );
 
@@ -347,7 +335,7 @@ static void InitSDL()
 static bool SetupRenderTarget()
 {
     SetRenderDrawBlendMode( renderer, SDL_BLENDMODE_NONE );
-    display_buffer.reset( SDL_CreateTexture( renderer.get(), SDL_PIXELFORMAT_ARGB8888,
+    display_buffer.reset( SDL_CreateTexture( renderer.get(), SDL_PIXELFORMAT_RGBA32,
                           SDL_TEXTUREACCESS_TARGET, WindowWidth / scaling_factor, WindowHeight / scaling_factor ) );
     if( printErrorIf( !display_buffer, "Failed to create window buffer" ) ) {
         return false;
@@ -632,24 +620,10 @@ SDL_Texture_Ptr CachedTTFFont::create_glyph( const std::string &ch, const int co
         dbg( D_ERROR ) << "Failed to create glyph for " << ch << ": " << TTF_GetError();
         return nullptr;
     }
-    /* SDL interprets each pixel as a 32-bit number, so our masks must depend
-       on the endianness (byte order) of the machine */
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    static const Uint32 rmask = 0xff000000;
-    static const Uint32 gmask = 0x00ff0000;
-    static const Uint32 bmask = 0x0000ff00;
-    static const Uint32 amask = 0x000000ff;
-#else
-    static const Uint32 rmask = 0x000000ff;
-    static const Uint32 gmask = 0x0000ff00;
-    static const Uint32 bmask = 0x00ff0000;
-    static const Uint32 amask = 0xff000000;
-#endif
     const int wf = utf8_wrapper( ch ).display_width();
     // Note: bits per pixel must be 8 to be synchronized with the surface
     // that TTF_RenderGlyph above returns. This is important for SDL_BlitScaled
-    SDL_Surface_Ptr surface = CreateRGBSurface( 0, fontwidth * wf, fontheight, 32, rmask, gmask, bmask,
-                              amask );
+    SDL_Surface_Ptr surface = CreateRGBSurface( 0, fontwidth * wf, fontheight, 32 );
     SDL_Rect src_rect = { 0, 0, sglyph->w, sglyph->h };
     SDL_Rect dst_rect = { 0, 0, fontwidth * wf, fontheight };
     if( src_rect.w < dst_rect.w ) {
@@ -4007,7 +3981,7 @@ bool save_screenshot( const std::string &file_path )
     SDL_RenderGetViewport( renderer.get(), &viewport );
 
     // Create SDL_Surface with depth of 32 bits (note: using zeros for the RGB masks sets a default value, based on the depth; Alpha mask will be 0).
-    SDL_Surface_Ptr surface = CreateRGBSurface( 0, viewport.w, viewport.h, 32, 0, 0, 0, 0 );
+    SDL_Surface_Ptr surface = SDL_Surface_Ptr( SDL_CreateRGBSurface( 0, viewport.w, viewport.h, 32, 0, 0, 0, 0 ) );
 
     // Get data from SDL_Renderer and save them into surface
     if( printErrorIf( SDL_RenderReadPixels( renderer.get(), nullptr, surface->format->format,

@@ -68,11 +68,7 @@ std::vector<SDL_Color> color_linear_interpolate( const SDL_Color &start_color,
 
 SDL_Surface_Ptr create_surface_32( int w, int h )
 {
-#if SDL_BYTEORDER == SDL_BIG_ENDIAN
-    return CreateRGBSurface( 0, w, h, 32, 0xFF000000, 0x00FF0000, 0x0000FF00, 0x000000FF );
-#else
-    return CreateRGBSurface( 0, w, h, 32, 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 );
-#endif
+    return CreateRGBSurface( 0, w, h, 32 );
 }
 
 void render_fill_rect( const SDL_Renderer_Ptr &renderer, const SDL_Rect &rect,

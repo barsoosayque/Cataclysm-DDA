@@ -156,7 +156,8 @@ void GetRenderDrawBlendMode( const SDL_Renderer_Ptr &renderer, SDL_BlendMode &bl
 SDL_Surface_Ptr load_image( const char *const path )
 {
     assert( path );
-    SDL_Surface_Ptr result( IMG_Load( path ) );
+    // Force RGBA32
+    SDL_Surface_Ptr result( SDL_ConvertSurfaceFormat( IMG_Load( path ), SDL_PIXELFORMAT_RGBA32, 0) );
     if( !result ) {
         throw std::runtime_error( "Could not load image \"" + std::string( path ) + "\": " +
                                   IMG_GetError() );
@@ -184,11 +185,9 @@ void RenderClear( const SDL_Renderer_Ptr &renderer )
     printErrorIf( SDL_RenderClear( renderer.get() ) != 0, "SDL_RenderCopy failed" );
 }
 
-SDL_Surface_Ptr CreateRGBSurface( const Uint32 flags, const int width, const int height,
-                                  const int depth, const Uint32 Rmask, const Uint32 Gmask, const Uint32 Bmask, const Uint32 Amask )
+SDL_Surface_Ptr CreateRGBSurface( const Uint32 flags, const int width, const int height, const int depth )
 {
-    SDL_Surface_Ptr surface( SDL_CreateRGBSurface( flags, width, height, depth, Rmask, Gmask, Bmask,
-                             Amask ) );
+    SDL_Surface_Ptr surface( SDL_CreateRGBSurfaceWithFormat( flags, width, height, depth, SDL_PIXELFORMAT_RGBA32 ) );
     throwErrorIf( !surface, "Failed to create surface" );
     return surface;
 }
